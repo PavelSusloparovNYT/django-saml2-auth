@@ -2,6 +2,8 @@
 # -*- coding:utf-8 -*-
 
 
+import logging
+
 from saml2 import (
     BINDING_HTTP_POST,
     BINDING_HTTP_REDIRECT,
@@ -34,6 +36,8 @@ if parse_version(get_version()) >= parse_version('1.7'):
 else:
     from django.utils.module_loading import import_by_path as import_string
 
+
+logger = logging.getLogger(__name__)
 
 def get_current_domain(r):
     return '{scheme}://{host}'.format(
@@ -122,15 +126,18 @@ def acs(r):
     next_url = r.session.get('login_next_url', settings.SAML2_AUTH.get('DEFAULT_NEXT_URL', get_reverse('admin:index')))
 
     if not resp:
+        logger.error("Response is empty: " + resp)
         return HttpResponseRedirect(get_reverse([denied, 'denied', 'django_saml2_auth:denied']))
 
     authn_response = saml_client.parse_authn_request_response(
         resp, entity.BINDING_HTTP_POST)
     if authn_response is None:
+        logger.error("authn_response is empty: " + resp)
         return HttpResponseRedirect(get_reverse([denied, 'denied', 'django_saml2_auth:denied']))
 
     user_identity = authn_response.get_identity()
     if user_identity is None:
+        logger.error("user_identity is empty: " + resp)
         return HttpResponseRedirect(get_reverse([denied, 'denied', 'django_saml2_auth:denied']))
 
     user_email = user_identity[settings.SAML2_AUTH.get('ATTRIBUTES_MAP', {}).get('email', 'Email')][0]
@@ -157,6 +164,7 @@ def acs(r):
         target_user.backend = 'django.contrib.auth.backends.ModelBackend'
         login(r, target_user)
     else:
+        logger.error("Target user is not active")
         return HttpResponseRedirect(get_reverse([denied, 'denied', 'django_saml2_auth:denied']))
 
     if is_new_user:
